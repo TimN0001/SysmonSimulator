@@ -76,7 +76,6 @@ void printText(char* ptr, WORD newColor) {
 void ProcessCreate1() {
 
     LPSTR cmdline = "C:\\Windows\\System32\\wbem\\WMIC.exe";
-    HANDLE hProcess = INVALID_HANDLE_VALUE;
     STARTUPINFOA sinfo = { 0 };
     sinfo.cb = sizeof(STARTUPINFOA);
     PROCESS_INFORMATION pinfo = { 0 };
@@ -152,17 +151,27 @@ void NetworkConnect3() {
     WSACleanup();
 }
 
-void processtermination5(int process_id)
+void processtermination5()
 {
-    HANDLE hProcessToKill = NULL;
-    hProcessToKill = OpenProcess(PROCESS_ALL_ACCESS, FALSE, process_id);
-    if (hProcessToKill == NULL) {
-        printf("[-] Error getting handle for PID %d. Error code is : %lu\n", process_id, GetLastError());
-    }
-    else
-    {
-        TerminateProcess(hProcessToKill, 1);
-        CloseHandle(hProcessToKill);
+    LPSTR cmdline = "C:\\Windows\\System32\\notepad.exe";
+    STARTUPINFOA sinfo = { 0 };
+    sinfo.cb = sizeof(STARTUPINFOA);
+    PROCESS_INFORMATION pinfo = { 0 };
+
+    if (!CreateProcessA(NULL, cmdline, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &sinfo, &pinfo)) {
+        printf("Error -: %lu\n", GetLastError());
+    } else {
+        int process_id = pinfo.dwProcessId;
+        printf("[+] Terminated   : PID %lu\n", process_id);
+        HANDLE hProcessToKill = OpenProcess(PROCESS_ALL_ACCESS, FALSE, process_id);
+        if (hProcessToKill == NULL) {
+            printf("[-] Error getting handle for PID %d. Error code is : %lu\n", process_id, GetLastError());
+        }
+        else
+        {
+            TerminateProcess(hProcessToKill, 1);
+            CloseHandle(hProcessToKill);
+        }
     }
 }
 
@@ -189,7 +198,6 @@ void createRemoteThread8() {
     HANDLE processHandle;
     PVOID buff;
     LPSTR cmdline = "C:\\Windows\\System32\\PING.exe";
-    HANDLE hProcess = INVALID_HANDLE_VALUE;
     STARTUPINFOA sinfo = { 0 };
     sinfo.cb = sizeof(STARTUPINFOA);
     PROCESS_INFORMATION pinfo = { 0 };
@@ -284,17 +292,28 @@ DWORD rawaccessread9() {
     return GetLastError();
 }
 
-void processaccess10(int process_id) {
+void processaccess10() {
+    LPSTR cmdline = "C:\\Windows\\System32\\notepad.exe";
+    STARTUPINFOA sinfo = { 0 };
+    sinfo.cb = sizeof(STARTUPINFOA);
+    PROCESS_INFORMATION pinfo = { 0 };
 
-    printf("[+] ProcessAccess: Process ID %lu\n", process_id);
-    HANDLE hProcessToAccess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, process_id);
-    if (hProcessToAccess) {
-        printf("[+] Successful   : Process handle was opened\n");
-        CloseHandle(hProcessToAccess);
+    if (!CreateProcessA(NULL, cmdline, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &sinfo, &pinfo)) {
+        printf("Error -: %lu\n", GetLastError());
     }
-    else
-    {
-        printf("Error code is : %lu\n", GetLastError());
+    else {
+        int process_id = pinfo.dwProcessId;
+        printf("[+] ProcessAccess: Process ID %lu\n", process_id);
+        HANDLE hProcessToAccess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, process_id);
+        if (hProcessToAccess == NULL) {
+            printf("[-] Error getting handle for PID %d. Error code is : %lu\n", process_id, GetLastError());
+        }
+        else
+        {
+            printf("[+] Successful   : Process handle was opened\n");
+            CloseHandle(hProcessToAccess);
+            TerminateProcess(hProcessToAccess, 1);
+        }
     }
 }
 
@@ -410,10 +429,9 @@ void fileCreateStreamHash15() {
 }
 
 void pipeCreated17() {
-    HANDLE hPipe = NULL;
     SECURITY_ATTRIBUTES secAttrib = { 0 };
     static LPCSTR lpName = "\\\\.\\pipe\\sysmontestnamedpipe";
-    hPipe = CreateNamedPipeA(lpName,
+    HANDLE hPipe = CreateNamedPipeA(lpName,
         PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
         PIPE_TYPE_BYTE | PIPE_WAIT,
         10,
@@ -421,14 +439,14 @@ void pipeCreated17() {
         2048,
         0,
         &secAttrib);
-    if (hPipe == INVALID_HANDLE_VALUE)
+    if (!(hPipe == INVALID_HANDLE_VALUE))
     {
-        printf("CreateNamedPipeA(): FAILED.Error code is : %lu\n", GetLastError());
-    }
-    else {
         printf("[+] Successful   : Pipe %s has been created\n", lpName);
         LocalFree(hPipe);
         CloseHandle(hPipe);
+    }
+    else {
+        printf("CreateNamedPipeA(): FAILED.Error code is : %lu\n", GetLastError());
     }
 }
 
@@ -463,6 +481,7 @@ void pipeConnect18() {
             CloseHandle(hPipe);
         }
         if (hConnectPipe != 0) {
+            DisconnectNamedPipe(hConnectPipe);
             CloseHandle(hConnectPipe);
         }
     }
@@ -728,7 +747,6 @@ void checkEvent(int eid) {
     printf("[+] Event Viewer : Check Sysmon Event ID %d for detection\n", eid);
     printf("[+] Event Time   : Event %d simulation is performed on ", eid);
     timestamp();
-
 }
 
 
@@ -740,7 +758,7 @@ void PrintUsage(){
 
 void PrintHelp() {
 
-    printf("\nSysmon Simulator v0.1 - Sysmon event simulation utility\n");
+    printf("\nSysmon Simulator v0.2 - Sysmon event simulation utility\n");
     printf("    A Windows utility to simulate Sysmon event logs\n\n");
 
     printText("Usage: \n", FOREGROUND_GREEN);
@@ -751,6 +769,7 @@ void PrintHelp() {
 
     printText("Parameters:\n", FOREGROUND_GREEN);
     printf(
+        "-all    : Run all simulations\n"
         "-eid 1  : Process creation\n"
         "-eid 2  : A process changed a file creation time\n"
         "-eid 3  : Network connection\n"
@@ -765,7 +784,6 @@ void PrintHelp() {
         "-eid 13 : RegistryEvent - Value Set\n"
         "-eid 14 : RegistryEvent - Key and Value Rename\n"
         "-eid 15 : FileCreateStreamHash\n"
-        "-eid 16 : ServiceConfigurationChange\n"
         "-eid 17 : PipeEvent - Pipe Created\n"
         "-eid 18 : PipeEvent - Pipe Connected\n"
         "-eid 19 : WmiEvent - WmiEventFilter activity detected\n"
@@ -793,6 +811,123 @@ void PrintBanner()
     printText("                                            by @ScarredMonk\n", FOREGROUND_RED);
 }
 
+void RunAll()
+{
+    printf("[+] Running simulation for Event ID     : 1\n");
+    ProcessCreate1();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 2\n");
+    FileCreateTime2();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 3\n");
+    NetworkConnect3();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 5\n");
+    processtermination5();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 6\n");
+    driverLoad6();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 7\n");
+    ImageLoaded7();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 8\n");
+    createRemoteThread8();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 9\n");
+    rawaccessread9();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 10\n");
+    processaccess10();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 11\n");
+    fileCreate11();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 12\n");
+    registryEvent12();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 13\n");
+    registryEvent13();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 14\n");
+    registryEvent14();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 15\n");
+    fileCreateStreamHash15();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 17\n");
+    pipeCreated17();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 18\n");
+    pipeConnect18();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 19\n");
+    wmiactivity19();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 20\n");
+    wmiactivity20();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 21\n");
+    wmiactivity21();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 22\n");
+    dnsquery22();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 24\n");
+    setClipboard24();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 25\n");
+    processTampering25();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+
+    printf("[+] Running simulation for Event ID     : 23 and 26\n");
+    deleteFile26();
+    printText("\r\n[+] Time gap of 1 second\r\n\n", FOREGROUND_GREEN);
+    Sleep(1000);
+}
 
 int main(int argc, char* argv[]) {
 
@@ -825,6 +960,11 @@ int main(int argc, char* argv[]) {
         else if (strcmp(argv[1], "-help") == 0 || strcmp(argv[1], "-h") == 0) {
             PrintBanner();
             PrintHelp();
+            return;
+        }
+        else if (strcmp(argv[1], "-all") == 0) {
+            printf("\r\n[+] -----Running all simulations-----\n\n");
+            RunAll();
             return;
         }
         else {
@@ -865,16 +1005,12 @@ int main(int argc, char* argv[]) {
         break;
 
     case 5:
-        printText("If you press Ctrl+c, it will generate process termination log for current process \n", FOREGROUND_RED);
-        printf("Or enter another process ID to kill the process:\n>");
-        scanf_s("%d", &process_id);
         printf(
             "\r\n[+] Simulation   : Started successfully\n"
             "[+] Event ID     : 5\n"
             "[+] Event Name   : Process Termination Event\n"
-            "[+] PID to kill  : %d\n", process_id
         );
-        processtermination5(process_id);
+        processtermination5();
         checkEvent(eid);
         break;
 
@@ -919,14 +1055,12 @@ int main(int argc, char* argv[]) {
         break;
 
     case 10:
-        printf("\r\nEnter the process ID of remote process to be opened/accessed:\n>");
-        scanf_s("%d", &process_id);
         printf(
             "\r\n[+] Simulation   : Started successfully\n"
             "[+] Event ID     : 10\n"
             "[+] Event Name   : Process Access Event\n"
         );
-        processaccess10(process_id);
+        processaccess10();
         checkEvent(eid);
         break;
 
@@ -1040,7 +1174,7 @@ int main(int argc, char* argv[]) {
     case 23:
         printf(
             "\r\n[+] Simulation   : Started successfully\n"
-            "[+] Event ID     : 26\n"
+            "[+] Event ID     : 23\n"
             "[+] Event Name   : File deletion Event\n"
         );
         deleteFile26();
